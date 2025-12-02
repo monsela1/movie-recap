@@ -3,259 +3,292 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI សម្រាយរឿង - Movie Recap</title>
+    <title>AI សម្រាយរឿង (Gemini Edition)</title>
     
-    <!-- ទាញយក React និង Tailwind ពីអ៊ីនធឺណិត (CDN) -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font ខ្មែរ -->
     <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Kantumruy+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
     
     <style>
         body { font-family: 'Kantumruy Pro', sans-serif; }
-        .font-khmer { font-family: 'Kantumruy Pro', sans-serif; }
+        .animate-pulse-fast { animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-slate-50 text-slate-800">
 
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useRef, useEffect } = React;
 
-        // --- ICONS (ជំនួស Lucide ដោយ SVG ដើម្បីអោយងាយស្រួល Copy) ---
+        // --- ICONS ---
         const Icons = {
-            Zap: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+            Gemini: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10 10 10 0 0 1-10-10 10 10 0 0 1 10-10z"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>,
             Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
             Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
             Pause: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
-            Globe: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
-            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
-            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
-            Loader2: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
-            Layers: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
-            Volume2: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>,
-            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
-            RefreshCw: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Loader: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+            Key: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
+            Volume: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         };
 
-        // --- MAIN APP COMPONENT ---
         function App() {
-            const [step, setStep] = useState('upload'); 
-            const [progress, setProgress] = useState(0);
-            const [processingStatus, setProcessingStatus] = useState('');
-            const [videoUrl, setVideoUrl] = useState('');
-            const [selectedStyle, setSelectedStyle] = useState('recap');
+            const [apiKey, setApiKey] = useState('');
+            const [step, setStep] = useState('setup'); 
+            const [status, setStatus] = useState('');
+            const [videoFile, setVideoFile] = useState(null);
+            const [videoUrl, setVideoUrl] = useState(null);
+            const [script, setScript] = useState('');
             const [isPlaying, setIsPlaying] = useState(false);
-            const [currentTime, setCurrentTime] = useState(0);
             
-            // ទិន្នន័យគំរូ
-            const demoScript = [
-                { time: '00:00', zh: '大家看，这个男人叫小帅。', km: 'មើលន៎! បុរសម្នាក់នេះឈ្មោះអាស្វិត។' },
-                { time: '00:05', zh: '他虽然很穷，但是非常努力。', km: 'ទោះបីជាគាត់ក្រ ប៉ុន្តែគាត់ជាមនុស្សខិតខំប្រឹងប្រែងណាស់។' },
-                { time: '00:10', zh: '有一天，他在路上捡到了一个神秘的盒子。', km: 'ថ្ងៃមួយ នៅតាមផ្លូវត្រលប់មកផ្ទះ គាត់បានរើសប្រអប់អាថ៌កំបាំងមួយ។' },
-                { time: '00:15', zh: '打开一看，里面竟然是一张藏宝图！', km: 'ពេលបើកមើល ស្រាប់តែឃើញផែនទីកំណប់មួយនៅក្នុងនោះ!' },
-                { time: '00:20', zh: '从此，他的人生发生了翻天覆地的变化。', km: 'ចាប់តាំងពីពេលនោះមក ជីវិតរបស់គាត់ក៏បានផ្លាស់ប្តូរទាំងស្រុង។' },
-                { time: '00:25', zh: '他决定踏上寻宝的旅程。', km: 'គាត់ក៏សម្រេចចិត្តចេញដំណើរស្វែងរកកំណប់ភ្លាមៗ។' }
-            ];
+            const videoRef = useRef(null);
 
-            const handleProcess = () => {
-                if (!videoUrl) return;
-                setStep('processing');
-                setProgress(0);
-                
-                const stages = [
-                    { msg: 'កំពុងភ្ជាប់ទៅកាន់ Server ចិន...', dur: 1500 },
-                    { msg: 'កំពុងទាញយកវីដេអូ (No Watermark)...', dur: 2000 },
-                    { msg: 'AI កំពុងស្តាប់ភាសាចិន (Whisper)...', dur: 2000 },
-                    { msg: 'GPT-4 កំពុងបកប្រែជាភាសាខ្មែរ...', dur: 2000 },
-                    { msg: 'កំពុងបង្កើតសំឡេងនិយាយ (TTS Khmer)...', dur: 2000 },
-                    { msg: 'កំពុងកាត់តវីដេអូបញ្ចូលគ្នា (Rendering)...', dur: 1500 }
-                ];
-
-                let accumulatedTime = 0;
-                stages.forEach((stage, index) => {
-                    setTimeout(() => {
-                        setProcessingStatus(stage.msg);
-                        const percent = ((index + 1) / stages.length) * 100;
-                        setProgress(percent);
-                        if (index === stages.length - 1) {
-                            setTimeout(() => {
-                                setStep('result');
-                                setIsPlaying(true);
-                            }, 1000);
-                        }
-                    }, accumulatedTime);
-                    accumulatedTime += stage.dur;
+            // --- HELPER: Convert File to Base64 ---
+            const fileToGenerativePart = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64String = reader.result.split(',')[1];
+                        resolve({
+                            inlineData: {
+                                data: base64String,
+                                mimeType: file.type
+                            }
+                        });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
                 });
             };
 
-            const handleReset = () => {
-                setStep('upload');
-                setVideoUrl('');
-                setProgress(0);
-                setIsPlaying(false);
-                setCurrentTime(0);
+            // --- GEMINI API CALL ---
+            const callGemini = async () => {
+                if (!apiKey) return alert("សូមបញ្ចូល Google Gemini API Key!");
+                if (!videoFile) return alert("សូមជ្រើសរើសវីដេអូ!");
+                
+                // Check File Size (Browser limitation for Base64)
+                if (videoFile.size > 20 * 1024 * 1024) {
+                    return alert("សូមអភ័យទោស! សម្រាប់ Version នេះសូមប្រើវីដេអូក្រោម 20MB។");
+                }
+
+                setStep('processing');
+                setStatus("កំពុងរៀបចំវីដេអូ...");
+
+                try {
+                    // 1. Prepare Image/Video Data
+                    const videoPart = await fileToGenerativePart(videoFile);
+
+                    // 2. Call Gemini 1.5 Flash
+                    setStatus("Gemini កំពុងមើលវីដេអូ និងសម្រាយរឿង...");
+                    
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: "You are a movie narrator. Watch this video and write a short, engaging recap script in Khmer language (Cambodian). Focus on the main action. Do not include timestamps, just the story." },
+                                    videoPart
+                                ]
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.error) throw new Error(data.error.message);
+                    
+                    const generatedText = data.candidates[0].content.parts[0].text;
+                    setScript(generatedText);
+                    setStep('result');
+                    
+                    // Auto-Speak after result
+                    speakText(generatedText);
+
+                } catch (error) {
+                    console.error(error);
+                    alert("បរាជ័យ: " + error.message);
+                    setStep('upload');
+                }
             };
 
-            useEffect(() => {
-                let interval;
-                if (isPlaying) {
-                    interval = setInterval(() => {
-                        setCurrentTime((prev) => (prev < 30 ? prev + 1 : 0));
-                    }, 1000);
+            // --- TTS (Browser Built-in) ---
+            const speakText = (text) => {
+                if ('speechSynthesis' in window) {
+                    // Stop previous speech
+                    window.speechSynthesis.cancel();
+
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'km-KH'; // Khmer Language Code
+                    
+                    // Try to find a Khmer voice if available (Android usually has Google Khmer)
+                    const voices = window.speechSynthesis.getVoices();
+                    const khmerVoice = voices.find(v => v.lang.includes('km'));
+                    if (khmerVoice) utterance.voice = khmerVoice;
+                    
+                    utterance.rate = 0.9; // Slightly slower for storytelling
+                    window.speechSynthesis.speak(utterance);
                 }
-                return () => clearInterval(interval);
-            }, [isPlaying]);
+            };
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    setVideoFile(file);
+                    setVideoUrl(URL.createObjectURL(file));
+                    setStep('upload');
+                }
+            };
+
+            const togglePlay = () => {
+                const vid = videoRef.current;
+                if (vid) {
+                    if (isPlaying) {
+                        vid.pause();
+                        window.speechSynthesis.pause();
+                    } else {
+                        vid.play();
+                        window.speechSynthesis.resume();
+                        // If speech finished, restart it? simplified for now
+                        if (!window.speechSynthesis.speaking && script) {
+                            speakText(script);
+                        }
+                    }
+                    setIsPlaying(!isPlaying);
+                }
+            };
 
             return (
-                <div className="min-h-screen pb-10">
-                    {/* Header */}
-                    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-                        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                                <div className="bg-blue-600 p-2 rounded-lg text-white">
-                                    <Icons.Zap />
-                                </div>
-                                <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
-                                    AI សម្រាយរឿង
-                                </h1>
-                            </div>
-                            <button className="bg-gray-900 text-white px-3 py-1.5 rounded-lg text-sm font-medium">ចូលគណនី</button>
+                <div className="min-h-screen pb-10 bg-slate-50">
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm">
+                        <div className="container mx-auto flex items-center justify-between">
+                            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 flex items-center gap-2">
+                                <span className="text-blue-600"><Icons.Gemini /></span> Gemini សម្រាយរឿង
+                            </h1>
                         </div>
                     </header>
 
-                    <main className="container mx-auto p-4 md:p-8 max-w-4xl">
+                    <main className="container mx-auto p-4 max-w-xl">
                         
-                        {/* VIEW 1: UPLOAD */}
+                        {/* 1. API KEY SETUP */}
+                        {step === 'setup' && (
+                            <div className="bg-white p-6 rounded-2xl shadow-lg mt-8 animate-fade-in">
+                                <div className="text-center mb-6">
+                                    <div className="mx-auto bg-purple-100 p-4 rounded-full w-16 h-16 flex items-center justify-center text-purple-600 mb-4">
+                                        <Icons.Key />
+                                    </div>
+                                    <h2 className="text-xl font-bold text-slate-800">Gemini API Key</h2>
+                                    <p className="text-slate-500 text-sm mt-2">ប្រើប្រាស់បច្ចេកវិទ្យា Google Gemini ដើម្បីមើល និងសម្រាយរឿង។</p>
+                                </div>
+                                <input 
+                                    type="password" 
+                                    placeholder="Paste your Gemini Key here..." 
+                                    className="w-full border border-slate-300 p-3 rounded-xl mb-4 focus:ring-2 focus:ring-purple-500 outline-none"
+                                    value={apiKey}
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                />
+                                <button 
+                                    onClick={() => apiKey ? setStep('upload') : alert('សូមបញ្ចូល Key')}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition"
+                                >
+                                    ចូលប្រើប្រាស់
+                                </button>
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" className="block text-xs text-blue-500 mt-4 text-center hover:underline">
+                                    ចុចទីនេះដើម្បីយក Free Gemini API Key
+                                </a>
+                            </div>
+                        )}
+
+                        {/* 2. UPLOAD */}
                         {step === 'upload' && (
-                            <div className="text-center py-6 animate-fade-in">
-                                <h2 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">
-                                    បកប្រែវីដេអូចិន ទៅជាខ្មែរ
-                                </h2>
-                                <p className="text-gray-500 mb-8">ដាក់ Link ពី Douyin ឬ TikTok ដើម្បីអោយ AI សម្រាយរឿង</p>
+                            <div className="text-center mt-8">
+                                <div className="border-2 border-dashed border-purple-200 rounded-2xl p-8 bg-white hover:bg-purple-50 transition">
+                                    <input 
+                                        type="file" 
+                                        accept="video/*" 
+                                        onChange={handleFileChange} 
+                                        className="hidden" 
+                                        id="videoUpload"
+                                    />
+                                    <label htmlFor="videoUpload" className="cursor-pointer block">
+                                        <div className="mx-auto w-16 h-16 text-purple-400 mb-3"><Icons.Upload /></div>
+                                        <span className="text-purple-700 font-bold text-lg">ជ្រើសរើសវីដេអូ</span>
+                                        <p className="text-slate-400 text-sm mt-2">Short Video (Max 20MB)</p>
+                                    </label>
+                                </div>
 
-                                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-left">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Video URL</label>
-                                    <div className="relative mb-6">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                                            <Icons.Globe />
+                                {videoFile && (
+                                    <div className="mt-6">
+                                        <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm font-medium mb-4 flex items-center justify-center gap-2">
+                                           ✅ បានជ្រើសរើស: {videoFile.name}
                                         </div>
-                                        <input
-                                            type="text"
-                                            className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
-                                            placeholder="https://v.douyin.com/..."
-                                            value={videoUrl}
-                                            onChange={(e) => setVideoUrl(e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4 mb-6">
-                                        <button onClick={() => setSelectedStyle('recap')} className={`p-4 border rounded-xl flex flex-col items-center ${selectedStyle === 'recap' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
-                                            <Icons.Layers />
-                                            <span className="font-bold mt-2">សម្រាយរឿង</span>
-                                        </button>
-                                        <button onClick={() => setSelectedStyle('dubbing')} className={`p-4 border rounded-xl flex flex-col items-center ${selectedStyle === 'dubbing' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
-                                            <Icons.Volume2 />
-                                            <span className="font-bold mt-2">បកប្រែផ្ទាល់</span>
+                                        <button 
+                                            onClick={callGemini}
+                                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-purple-200 text-lg active:scale-95 transition"
+                                        >
+                                            ចាប់ផ្តើមសម្រាយ (Gemini) ✨
                                         </button>
                                     </div>
-
-                                    <button
-                                        onClick={handleProcess}
-                                        disabled={!videoUrl}
-                                        className={`w-full py-4 rounded-xl text-white font-bold text-lg transition ${!videoUrl ? 'bg-gray-300' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg'}`}
-                                    >
-                                        ចាប់ផ្តើមដំណើរការ AI 🚀
-                                    </button>
-                                    
-                                    <div className="mt-4 text-center">
-                                       <button onClick={() => setVideoUrl('https://v.douyin.com/demo123')} className="text-blue-500 text-sm">ចុចទីនេះដើម្បីសាកល្បង (Demo)</button>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         )}
 
-                        {/* VIEW 2: PROCESSING */}
+                        {/* 3. PROCESSING */}
                         {step === 'processing' && (
-                            <div className="flex flex-col items-center justify-center pt-10">
-                                <div className="relative w-24 h-24 mb-6 text-blue-600">
-                                    <Icons.Loader2 />
-                                    <div className="absolute inset-0 flex items-center justify-center font-bold text-gray-700">{Math.round(progress)}%</div>
-                                </div>
-                                <h2 className="text-xl font-bold mb-2">AI កំពុងធ្វើការ...</h2>
-                                <p className="text-blue-600 animate-pulse mb-6">{processingStatus}</p>
-                                <div className="w-full max-w-md bg-gray-200 rounded-full h-2">
-                                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
-                                </div>
+                            <div className="text-center mt-20">
+                                <div className="animate-spin text-purple-600 mx-auto w-16 h-16 mb-4"><Icons.Loader /></div>
+                                <h2 className="text-xl font-bold text-slate-800">កំពុងដំណើរការ...</h2>
+                                <p className="text-purple-600 animate-pulse-fast mt-2 font-medium">{status}</p>
                             </div>
                         )}
 
-                        {/* VIEW 3: RESULT */}
+                        {/* 4. RESULT */}
                         {step === 'result' && (
-                            <div className="space-y-6">
-                                {/* Video Player */}
-                                <div className="bg-black rounded-2xl overflow-hidden shadow-2xl relative aspect-video group">
-                                    <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                                        <div className="text-white opacity-20 text-6xl font-bold">VIDEO</div>
-                                        {!isPlaying && (
-                                            <div className="absolute z-10 bg-white/20 p-4 rounded-full cursor-pointer backdrop-blur-sm" onClick={() => setIsPlaying(true)}>
-                                                <div className="text-white"><Icons.Play /></div>
-                                            </div>
-                                        )}
-                                    </div>
+                            <div className="space-y-6 mt-4 pb-20">
+                                <div className="bg-black rounded-2xl overflow-hidden shadow-2xl relative aspect-[9/16] max-w-sm mx-auto border-4 border-white">
+                                    <video 
+                                        ref={videoRef}
+                                        src={videoUrl}
+                                        className="w-full h-full object-cover"
+                                        playsInline
+                                        loop
+                                        muted // Mute original sound
+                                    />
                                     
-                                    {/* Subtitle Overlay */}
-                                    {isPlaying && (
-                                        <div className="absolute bottom-16 w-full text-center px-4">
-                                            <span className="inline-block bg-black/70 text-yellow-300 px-3 py-2 rounded-lg text-lg backdrop-blur-md shadow-sm">
-                                                {demoScript[Math.floor((currentTime / 30) * demoScript.length)]?.km || "..."}
-                                            </span>
+                                    {/* Play Overlay */}
+                                    {!isPlaying && (
+                                        <div 
+                                            className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer backdrop-blur-[1px]"
+                                            onClick={togglePlay}
+                                        >
+                                            <div className="text-white transform scale-150 drop-shadow-lg"><Icons.Play /></div>
                                         </div>
                                     )}
-
-                                    {/* Controls */}
-                                    <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4 text-white flex justify-between items-center">
-                                        <button onClick={() => setIsPlaying(!isPlaying)}>
-                                            {isPlaying ? <Icons.Pause /> : <Icons.Play />}
-                                        </button>
-                                        <span className="text-sm font-mono">00:{currentTime < 10 ? '0'+currentTime : currentTime} / 00:30</span>
-                                    </div>
                                 </div>
 
-                                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                                    <div className="font-bold text-gray-700">លទ្ធផលសម្រាយ</div>
-                                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm">
-                                        <Icons.Download /> <span>Save MP4</span>
-                                    </button>
-                                </div>
-
-                                {/* Script Box */}
-                                <div className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
-                                    <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center">
-                                        <div className="text-blue-500 mr-2"><Icons.FileText /></div>
-                                        <h3 className="font-bold text-gray-700">Script (អត្ថបទ)</h3>
-                                    </div>
-                                    <div className="p-4 space-y-3 max-h-60 overflow-y-auto">
-                                        {demoScript.map((line, idx) => (
-                                            <div key={idx} className={`p-2 rounded ${Math.floor((currentTime / 30) * demoScript.length) === idx ? 'bg-blue-50 border border-blue-100' : ''}`}>
-                                                <div className="text-xs text-gray-400">{line.time}</div>
-                                                <div className="text-gray-400 text-xs">{line.zh}</div>
-                                                <div className="text-gray-800 font-medium">{line.km}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="p-4 border-t border-gray-100">
-                                        <button onClick={handleReset} className="w-full py-2 border border-gray-300 rounded-lg text-gray-600 flex justify-center items-center hover:bg-gray-50">
-                                            <span className="mr-2"><Icons.RefreshCw /></span> ធ្វើវីដេអូថ្មី
+                                {/* Script Card */}
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                            <Icons.Gemini /> សម្រាយដោយ Gemini
+                                        </h3>
+                                        <button onClick={() => speakText(script)} className="text-blue-600 bg-blue-50 p-2 rounded-full hover:bg-blue-100">
+                                            <Icons.Volume />
                                         </button>
                                     </div>
+                                    <div className="text-slate-700 leading-8 font-khmer bg-slate-50 p-4 rounded-xl text-base text-justify">
+                                        {script}
+                                    </div>
                                 </div>
+                                
+                                <button onClick={() => window.location.reload()} className="w-full py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-slate-600 transition">
+                                    ធ្វើវីដេអូថ្មី
+                                </button>
                             </div>
                         )}
+
                     </main>
                 </div>
             );
