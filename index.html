@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malis AI - Movie Studio V6 (Fixed Audio)</title>
+    <title>Malis AI - Studio V7 (Cinema Mode)</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -12,17 +12,28 @@
     <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Kantumruy+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Kantumruy Pro', sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #111827; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        body { font-family: 'Kantumruy Pro', sans-serif; background: #000; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #111; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
         
-        /* Highlight selected mode */
-        .mode-selected { border: 2px solid #eab308; background: #374151; color: #eab308; }
-        .mode-default { border: 1px solid #374151; background: #1f2937; color: #9ca3af; }
+        /* Cinema Mode Styles */
+        .cinema-mode {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .subtitle-overlay {
+            position: absolute; bottom: 10%; left: 5%; right: 5%;
+            background: rgba(0,0,0,0.7); color: yellow;
+            padding: 15px; border-radius: 10px;
+            text-align: center; font-size: 18px; line-height: 1.6;
+            text-shadow: 2px 2px 4px black;
+            font-family: 'Battambang', cursive;
+        }
     </style>
 </head>
-<body class="bg-black text-white min-h-screen">
+<body class="text-white min-h-screen">
 
     <div id="root"></div>
 
@@ -35,11 +46,11 @@
             Book: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
             Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
             Stop: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>,
-            Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Cinema: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>,
+            Close: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         };
 
         function App() {
-            // --- STATE ---
             const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_api_key") || "");
             const [videoFile, setVideoFile] = useState(null);
             const [videoUrl, setVideoUrl] = useState(null);
@@ -47,64 +58,48 @@
             const [status, setStatus] = useState("");
             const [translatedText, setTranslatedText] = useState("");
             const [step, setStep] = useState(apiKey ? 'main' : 'setup');
-            
-            // Mode: 'recap' (សម្រាយ) vs 'dubbing' (និយាយតាមតួ)
             const [mode, setMode] = useState('recap'); 
-            
             const [isPlaying, setIsPlaying] = useState(false);
+            const [isCinemaMode, setIsCinemaMode] = useState(false); // New Mode
+            
             const videoRef = useRef(null);
+            const cinemaVideoRef = useRef(null);
 
-            // Save Key
             useEffect(() => {
                 if(apiKey) localStorage.setItem("gemini_api_key", apiKey);
             }, [apiKey]);
 
-            // --- AUDIO ENGINE (HYBRID: System + Google Fallback) ---
+            // --- AUDIO ENGINE ---
             const speakText = (text) => {
-                window.speechSynthesis.cancel(); // Stop old audio
+                window.speechSynthesis.cancel();
                 setIsPlaying(true);
 
-                // 1. Try Native Browser Voice (Best for Android)
+                // Use System Voice (High Quality on Mobile)
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'km-KH'; 
-                utterance.rate = 1.0; 
+                utterance.rate = 0.9; // Slightly slower for better dubbing feel
 
-                // Check voices
                 const voices = window.speechSynthesis.getVoices();
                 const khmerVoice = voices.find(v => v.lang.includes('km'));
                 if (khmerVoice) utterance.voice = khmerVoice;
 
                 utterance.onend = () => setIsPlaying(false);
                 utterance.onerror = (e) => {
-                    console.error("System Voice Error", e);
-                    // Fallback to Google Online if System fails
-                    playGoogleFallback(text);
+                    console.error("System Voice Failed", e);
+                    playGoogleFallback(text); // Fallback
                 };
-
                 window.speechSynthesis.speak(utterance);
             };
 
             const playGoogleFallback = (text) => {
-                // Split text because Google API limits length
                 const chunks = text.match(/[^.!?។]+[.!?។]+/g) || [text];
                 let index = 0;
-
                 const playNext = () => {
-                    if (index >= chunks.length) {
-                        setIsPlaying(false);
-                        return;
-                    }
-                    const chunk = chunks[index];
-                    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=km&q=${encodeURIComponent(chunk)}`;
+                    if (index >= chunks.length) { setIsPlaying(false); return; }
+                    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=km&q=${encodeURIComponent(chunks[index])}`;
                     const audio = new Audio(url);
-                    audio.onended = () => {
-                        index++;
-                        playNext();
-                    };
-                    audio.onerror = () => {
-                        alert("មិនអាចដំណើរការសម្លេងបាន (Blocked)។");
-                        setIsPlaying(false);
-                    };
+                    audio.onended = () => { index++; playNext(); };
+                    audio.onerror = () => setIsPlaying(false);
                     audio.play();
                 };
                 playNext();
@@ -115,173 +110,163 @@
                 setIsPlaying(false);
             };
 
-            // --- MAIN LOGIC ---
+            // --- ACTIONS ---
             const handleProcess = async () => {
                 if (!videoFile) return alert("សូមដាក់វីដេអូសិន!");
                 setIsProcessing(true);
-                setTranslatedText(""); 
                 stopAudio();
 
                 try {
-                    setStatus("🚀 កំពុងភ្ជាប់ទៅ Gemini...");
-                    
-                    // Convert Video to Base64
                     const reader = new FileReader();
                     reader.readAsDataURL(videoFile);
                     reader.onload = async () => {
                         const base64Data = reader.result.split(',')[1];
                         
-                        // --- PROMPT ENGINEERING (CRITICAL) ---
-                        let systemPrompt = "";
-                        
-                        if (mode === 'recap') {
-                            setStatus("🍿 កំពុងបង្កើតសាច់រឿងសម្រាយ...");
-                            systemPrompt = `
-                                តួនាទី: អ្នកនិទានរឿងភាពយន្ត (Movie Narrator)។
-                                កិច្ចការ: មើលវីដេអូនេះ ហើយសរសេរ "អត្ថបទសម្រាយរឿង" ជាភាសាខ្មែរ។
-                                លក្ខខណ្ឌ:
-                                1. សរសេរជាកថាខណ្ឌ (Paragraph) បែបនិទានរឿង។
-                                2. ប្រើពាក្យដូចជា "សាច់រឿងចាប់ផ្តើម...", "ស្រាប់តែ...", "បន្ទាប់មក..."។
-                                3. មិនត្រូវសរសេរឈ្មោះតួ (A:, B:) ទេ គឺសរសេររៀបរាប់សកម្មភាព និងពាក្យនិយាយបញ្ចូលគ្នា។
-                            `;
-                        } else {
-                            setStatus("🎙️ កំពុងបកប្រែពាក្យតួអង្គ (Dubbing)...");
-                            systemPrompt = `
-                                តួនាទី: អ្នកបកប្រែរឿង (Dubbing Translator)។
-                                កិច្ចការ: បកប្រែតែ "ពាក្យនិយាយរបស់តួអង្គ" នៅក្នុងវីដេអូនេះជាភាសាខ្មែរ។
-                                លក្ខខណ្ឌ:
-                                1. ហាមសរសេរសកម្មភាព (Action) សរសេរតែពាក្យដែលគេនិយាយប៉ុណ្ណោះ។
-                                2. ប្រើភាសានិយាយធំៗ (Conversational Khmer) ដូចជា "អញ", "ឯង", "បង", "អូន"។
-                                3. បំបែកឃ្លានិយាយមួយបន្ទាត់ម្តងៗ ដើម្បីងាយស្រួលបញ្ចូលសម្លេង។
-                            `;
-                        }
+                        let systemPrompt = mode === 'recap' 
+                            ? "សរសេរអត្ថបទសម្រាយរឿងជាភាសាខ្មែរ (Narrative Style)។ សរសេរជាកថាខណ្ឌ។" 
+                            : "បកប្រែពាក្យនិយាយតួអង្គជាភាសាខ្មែរ (Dubbing Script)។ សរសេរជាឃ្លាខ្លីៗ។";
 
-                        // Call Gemini
                         const response = await fetch(
                             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
                             {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({
-                                    contents: [{
-                                        parts: [
-                                            { text: systemPrompt },
-                                            { inline_data: { mime_type: videoFile.type, data: base64Data } }
-                                        ]
-                                    }]
+                                    contents: [{ parts: [{ text: systemPrompt }, { inline_data: { mime_type: videoFile.type, data: base64Data } }] }]
                                 })
                             }
                         );
-
                         const data = await response.json();
                         if (data.error) throw new Error(data.error.message);
-                        const resultText = data.candidates[0].content.parts[0].text;
                         
-                        setTranslatedText(resultText);
-                        setStatus("✅ រួចរាល់!");
-                        
-                        // Auto Play
-                        speakText(resultText);
+                        const text = data.candidates[0].content.parts[0].text;
+                        setTranslatedText(text);
+                        speakText(text);
                     };
-
                 } catch (e) {
                     alert("Error: " + e.message);
-                    setStatus("❌ បរាជ័យ");
                 } finally {
                     setIsProcessing(false);
                 }
             };
 
+            const toggleCinemaMode = () => {
+                if (!isCinemaMode) {
+                    // Start Cinema
+                    setIsCinemaMode(true);
+                    stopAudio();
+                    setTimeout(() => {
+                        if (cinemaVideoRef.current) {
+                            cinemaVideoRef.current.currentTime = 0;
+                            cinemaVideoRef.current.play();
+                            speakText(translatedText);
+                        }
+                    }, 500);
+                } else {
+                    // Stop Cinema
+                    setIsCinemaMode(false);
+                    stopAudio();
+                }
+            };
+
             return (
                 <div className="max-w-xl mx-auto p-4 pb-20">
+                    
+                    {/* HEADER */}
                     <header className="flex justify-between items-center py-4 mb-6 border-b border-gray-800">
-                        <h1 className="text-xl font-bold text-yellow-500">Malis AI <span className="text-xs text-gray-500">V6 (Sound Fixed)</span></h1>
+                        <h1 className="text-xl font-bold text-yellow-500">Malis AI <span className="text-xs text-white">V7</span></h1>
                         {apiKey && <button onClick={() => {localStorage.removeItem("gemini_api_key"); window.location.reload();}} className="text-xs text-red-500">Log Out</button>}
                     </header>
 
-                    {step === 'setup' ? (
-                        <div className="bg-gray-900 p-6 rounded-2xl border border-gray-800 text-center">
+                    {/* SETUP */}
+                    {step === 'setup' && (
+                        <div className="bg-gray-900 p-6 rounded-2xl text-center">
                             <h2 className="text-lg font-bold mb-4">🔑 បញ្ចូល API Key</h2>
-                            <input 
-                                type="password" 
-                                className="w-full bg-black border border-gray-700 p-3 rounded-lg text-white mb-4 text-center"
-                                placeholder="Paste Gemini Key Here"
-                                onChange={(e) => setApiKey(e.target.value)}
-                            />
+                            <input type="password" onChange={(e) => setApiKey(e.target.value)} className="w-full bg-black border border-gray-700 p-3 rounded-lg text-white mb-4 text-center" placeholder="Paste Key Here" />
                             <button onClick={() => apiKey && setStep('main')} className="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg">ចូលប្រើប្រាស់</button>
                         </div>
-                    ) : (
-                        <div className="space-y-6">
-                            {/* 1. SELECT MODE */}
-                            <div>
-                                <label className="text-gray-400 text-xs uppercase font-bold mb-2 block">១. ជ្រើសរើសប្រភេទ (Select Option)</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button 
-                                        onClick={() => setMode('recap')}
-                                        className={`p-4 rounded-xl flex flex-col items-center justify-center transition ${mode === 'recap' ? 'mode-selected' : 'mode-default'}`}
-                                    >
-                                        <Icons.Book />
-                                        <span className="font-bold mt-2">សម្រាយរឿង</span>
-                                        <span className="text-[10px] opacity-70">Story Recap</span>
-                                    </button>
+                    )}
 
-                                    <button 
-                                        onClick={() => setMode('dubbing')}
-                                        className={`p-4 rounded-xl flex flex-col items-center justify-center transition ${mode === 'dubbing' ? 'mode-selected' : 'mode-default'}`}
-                                    >
-                                        <Icons.Mic />
-                                        <span className="font-bold mt-2">និយាយតាមតួ</span>
-                                        <span className="text-[10px] opacity-70">Dubbing Script</span>
-                                    </button>
-                                </div>
+                    {/* MAIN UI */}
+                    {step === 'main' && (
+                        <div className="space-y-4">
+                            {/* Mode Select */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => setMode('recap')} className={`p-3 rounded-xl border ${mode === 'recap' ? 'border-yellow-500 bg-gray-800 text-yellow-500' : 'border-gray-700 bg-gray-900 text-gray-400'}`}>📖 សម្រាយរឿង</button>
+                                <button onClick={() => setMode('dubbing')} className={`p-3 rounded-xl border ${mode === 'dubbing' ? 'border-yellow-500 bg-gray-800 text-yellow-500' : 'border-gray-700 bg-gray-900 text-gray-400'}`}>🎙️ និយាយតាមតួ</button>
                             </div>
 
-                            {/* 2. UPLOAD */}
-                            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+                            {/* Video Upload */}
+                            <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden relative min-h-[150px] flex items-center justify-center">
                                 {!videoUrl ? (
-                                    <div className="relative h-32 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center">
-                                        <p className="text-gray-500 text-sm">ចុចទីនេះ ដើម្បីដាក់វីដេអូ</p>
+                                    <>
+                                        <div className="text-center">
+                                            <p className="text-gray-500">ចុចដើម្បីដាក់វីដេអូ</p>
+                                        </div>
                                         <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => {
                                             const f = e.target.files[0];
                                             if(f) { setVideoFile(f); setVideoUrl(URL.createObjectURL(f)); }
                                         }} />
-                                    </div>
+                                    </>
                                 ) : (
-                                    <div className="relative">
-                                        <video src={videoUrl} controls className="w-full rounded-lg max-h-60" />
-                                        <button onClick={() => {setVideoUrl(null); setVideoFile(null);}} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs">Remove</button>
-                                    </div>
+                                    <video ref={videoRef} src={videoUrl} controls className="w-full max-h-60" />
                                 )}
                             </div>
 
-                            {/* 3. GENERATE BUTTON */}
-                            <button 
-                                onClick={handleProcess}
-                                disabled={isProcessing || !videoFile}
-                                className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg ${isProcessing ? 'bg-gray-700' : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-black'}`}
-                            >
-                                {isProcessing ? status : (mode === 'recap' ? '✨ ចាប់ផ្តើមសម្រាយ' : '🗣️ ចាប់ផ្តើមបកប្រែ')}
+                            {/* Generate Button */}
+                            <button onClick={handleProcess} disabled={isProcessing || !videoFile} className={`w-full py-4 rounded-xl font-bold text-lg ${isProcessing ? 'bg-gray-700' : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-black'}`}>
+                                {isProcessing ? 'កំពុងបង្កើត...' : '✨ ចាប់ផ្តើម (Start)'}
                             </button>
 
-                            {/* 4. RESULT & AUDIO */}
+                            {/* Result Area */}
                             {translatedText && (
-                                <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 animate-fade-in">
-                                    <div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
-                                        <h3 className="font-bold text-yellow-500">លទ្ធផល ({mode === 'recap' ? 'សម្រាយ' : 'និយាយតាមតួ'})</h3>
-                                        <button 
-                                            onClick={isPlaying ? stopAudio : () => speakText(translatedText)}
-                                            className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 ${isPlaying ? 'bg-red-500 text-white' : 'bg-green-600 text-white'}`}
-                                        >
-                                            {isPlaying ? <><Icons.Stop /> ឈប់</> : <><Icons.Play /> ស្តាប់</>}
-                                        </button>
+                                <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="font-bold text-yellow-500">លទ្ធផល</h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => speakText(translatedText)} className="text-xs bg-green-600 px-3 py-1 rounded">Play Audio</button>
+                                            
+                                            {/* CINEMA MODE BUTTON */}
+                                            <button onClick={toggleCinemaMode} className="text-xs bg-red-600 text-white px-3 py-1 rounded flex items-center gap-1 animate-pulse font-bold">
+                                                <Icons.Cinema /> 🔴 Record Video
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="text-gray-300 whitespace-pre-line leading-relaxed text-lg max-h-96 overflow-y-auto custom-scrollbar">
-                                        {translatedText}
-                                    </div>
+                                    <div className="text-gray-400 text-sm max-h-40 overflow-y-auto">{translatedText}</div>
                                 </div>
                             )}
                         </div>
                     )}
+
+                    {/* --- CINEMA MODE OVERLAY (FOR SCREEN RECORDING) --- */}
+                    {isCinemaMode && videoUrl && (
+                        <div className="cinema-mode">
+                            {/* Video Container */}
+                            <div className="relative w-full max-w-lg aspect-video">
+                                <video 
+                                    ref={cinemaVideoRef} 
+                                    src={videoUrl} 
+                                    className="w-full h-full object-contain"
+                                    onEnded={() => setIsPlaying(false)}
+                                />
+                                
+                                {/* Subtitle Overlay */}
+                                <div className="subtitle-overlay">
+                                    {translatedText}
+                                </div>
+                            </div>
+
+                            {/* Close Button */}
+                            <button onClick={toggleCinemaMode} className="absolute top-5 right-5 bg-white/20 p-2 rounded-full text-white hover:bg-white/40">
+                                <Icons.Close />
+                            </button>
+
+                            <div className="absolute bottom-10 text-gray-500 text-xs animate-pulse">
+                                🔴 សូមបើក Screen Record ក្នុងទូរស័ព្ទរបស់អ្នកឥឡូវនេះ
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             );
         }
